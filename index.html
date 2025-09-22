@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ru" style="scroll-behavior:smooth;">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Интерактивный дашборд | Антон Рясов</title>
+  <meta name="description" content="Интерактивный дашборд для бизнес-аналитики в визуальном стиле портфолио Антона Рясова."/>
+  <meta name="theme-color" content="#0c0a09"/>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+
+  <!-- Chart.js + date adapter -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <style>
+    :root{
+      /* Базовая палитра (в стиле портфолио) */
+      --neon-orange:#ff7f00;
+      --neon-cyan:#22d3ee;
+      --neon-violet:#8b5cf6;
+      --neon-blue:#3b82f6;
+      --bg:#0c0a09;
+      --card:#111112;
+      --card-soft:rgba(255,255,255,.04);
+      --border:rgba(255,255,255,.10);
+      --text:#e5e7eb;
+      --text-dim:#9aa4b2;
+      --grid:#1f2937;
+
+      /* Размеры типографики */
+      --title-size:clamp(1.8rem,3.2vw,2.6rem);
+      --subtitle-size:clamp(1rem,1.8vw,1.125rem);
+    }
+
+    /* Бэкграунд с «авророй» + шумом (как на сайте) */
+    body{
+      font-family:'Inter',sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      overflow-x:hidden;
+    }
+    .aurora-background{position:fixed;inset:0;z-index:-1;overflow:hidden;filter:saturate(1.15) brightness(1.08)}
+    .aurora-background::after{
+      content:'';position:absolute;inset:0;pointer-events:none;
+      background-image:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAMAAAAp4XiDAAAAUVBMVEWFhYWDg4N3d3dtbW17e3t1dHTZ2dnu7u7X1dWYmJixsbGvrq7W1dfMzMy4uLioqKiiouLW1rePj4+Pj5fZ2dni4uLy8vLz8/P09PTy8vLV1dfGxsY/B53aAAAAWklEQVR42tVRBwYAMQiDztDPsP/u/w+wgyoFBrIZFmB4J0tJgkx3E9ZJt25n/ACQmmky8Mho3OqXQoF7F232aUPh2SATE4pSlp0zHw5T8wA1EwA1s/IA3bA45gD5yQyAAAAAElFTkSuQmCC');
+      opacity:.05
+    }
+    .orb{
+      position:absolute;border-radius:9999px;mix-blend-mode:screen;filter:blur(90px);
+      will-change:transform;animation:drift 16s ease-in-out infinite alternate;
+    }
+    @keyframes drift{
+      from{transform:translate(0,0) scale(1)}
+      to{transform:translate(2vw,-2vh) scale(1.03)}
+    }
+
+    /* Типографика */
+    .ty-title{
+      font-size:var(--title-size);
+      font-weight:900;
+      line-height:1.1
+    }
+    .ty-subtitle{
+      font-size:var(--subtitle-size);
+      color:var(--text-dim);
+      line-height:1.4
+    }
+    .animated-gradient-text{
+      background:linear-gradient(120deg,var(--neon-violet),var(--neon-cyan),var(--neon-orange));
+      background-size:220% 220%;
+      -webkit-background-clip:text;background-clip:text;
+      color:transparent;-webkit-text-fill-color:transparent;
+      animation:move-gradient 7s ease-in-out infinite alternate;
+    }
+    @keyframes move-gradient{0%{background-position:0% 50%}100%{background-position:100% 50%}}
+
+    /* Карточки/контейнеры */
+    .container{max-width:1280px;margin:0 auto;padding:24px}
+    .card{
+      background:var(--card-soft);
+      border:1px solid var(--border);
+      border-radius:16px;padding:22px;
+      backdrop-filter:blur(8px);
+      transition:transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    }
+    .card:hover{
+      transform:translateY(-3px);
+      border-color:rgba(34,211,238,.45);
+      box-shadow:0 0 28px rgba(34,211,238,.10),0 0 12px rgba(139,92,246,.08) inset;
+    }
+    .widget-title{font-weight:800;letter-spacing:.2px;margin-bottom:16px}
+
+    /* Неоновая обводка (как кнопки/плашки на сайте) */
+    .neon-outline{position:relative;border-radius:12px}
+    .neon-outline::before{
+      content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;
+      background:linear-gradient(45deg,var(--neon-cyan),var(--neon-orange));
+      -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
+      -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;opacity:1
+    }
+    .neon-outline::after{
+      content:"";position:absolute;inset:0;border-radius:inherit;
+      background:linear-gradient(45deg,var(--neon-cyan),var(--neon-orange));
+      filter:blur(18px);opacity:.25;z-index:-1;pointer-events:none
+    }
+
+    /* Хедер */
+    .dashboard-header{
+      display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
+      margin-bottom:22px;padding-bottom:16px;border-bottom:1px dashed var(--border)
+    }
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{
+      position:relative;display:inline-flex;align-items:center;gap:10px;
+      padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);
+      border:1px solid var(--border);color:var(--text);cursor:pointer;
+      transition:background .2s ease, border-color .2s ease; font-weight:600;
+    }
+    .btn:hover{background:rgba(255,255,255,.07);border-color:rgba(34,211,238,.45)}
+    .btn i{color:var(--neon-cyan)}
+
+    /* KPI */
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+    .kpi-card{display:flex;flex-direction:column;gap:8px}
+    .kpi-top{display:flex;align-items:center;justify-content:space-between}
+    .kpi-icon{
+      width:52px;height:52px;border-radius:14px;
+      display:grid;place-items:center;
+      background:linear-gradient(135deg,rgba(34,211,238,.15),rgba(59,130,246,.15));
+      color:#8defff
+    }
+    .kpi-change{font-weight:700;display:flex;align-items:center;gap:6px}
+    .kpi-change.positive{color:#10b981}
+    .kpi-change.negative{color:#ef4444}
+    .kpi-title{color:var(--text-dim);font-weight:600}
+    .kpi-value{font-size:2.6rem;font-weight:900;line-height:1}
+    .number-gradient-flow{
+      background:linear-gradient(90deg,#8b5cf6,#3b82f6,#06b6d4,#8b5cf6);
+      background-size:300% 100%;
+      -webkit-background-clip:text;background-clip:text;color:transparent;
+      animation:gradientFlow 6s linear infinite
+    }
+    @keyframes gradientFlow{0%{background-position:0% 50%}100%{background-position:100% 50%}}
+
+    /* Грид виджетов */
+    .main-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:18px;margin-top:18px}
+    .widget-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .segmented{display:flex;gap:6px;background:rgba(255,255,255,.04);border:1px solid var(--border);padding:6px;border-radius:12px}
+    .seg-btn{
+      padding:6px 12px;border-radius:8px;border:none;background:transparent;color:var(--text-dim);
+      font-weight:700;cursor:pointer;transition:all .2s ease
+    }
+    .seg-btn.active{
+      color:#0b1520;
+      background:linear-gradient(135deg,var(--neon-cyan),var(--neon-blue));
+      box-shadow:0 0 18px rgba(34,211,238,.25);
+    }
+
+    /* Чарты */
+    .chart-container{position:relative;width:100%;height:350px}
+    /* Таблица */
+    .table-wrap{overflow:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px 8px;text-align:left}
+    th{color:var(--text-dim);font-size:.8rem;text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border)}
+    tbody tr{border-bottom:1px solid rgba(255,255,255,.06)}
+    tbody tr:hover{background:rgba(255,255,255,.04)}
+
+    /* Прелоадер */
+    .preloader{position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 30%,rgba(139,92,246,.15),rgba(0,0,0,.6)),var(--bg);
+      display:grid;place-items:center;transition:opacity .4s ease}
+    .loader{
+      width:64px;height:64px;border-radius:9999px;position:relative;
+      background:conic-gradient(from 0deg, var(--neon-cyan), var(--neon-blue), var(--neon-violet), var(--neon-orange), var(--neon-cyan));
+      animation:spin 1.6s linear infinite;filter:blur(.3px)
+    }
+    .loader::after{
+      content:"";position:absolute;inset:6px;border-radius:inherit;background:var(--bg)
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* Скрытый input */
+    input[type="file"]{display:none}
+
+    /* Адаптив */
+    @media (max-width:480px){
+      .chart-container{height:300px}
+      .kpi-value{font-size:2.2rem}
+    }
+  </style>
+</head>
+<body>
+  <!-- AURORA BACKGROUND -->
+  <div class="aurora-background">
+    <div class="orb" style="top:8%; left:6%; width:720px; height:720px; background:radial-gradient(circle at 30% 30%, rgba(139,92,246,.55), rgba(34,211,238,.35), transparent 70%);"></div>
+    <div class="orb" style="top:-12%; right:-10%; width:880px; height:880px; background:radial-gradient(circle at 60% 40%, rgba(34,211,238,.50), rgba(59,130,246,.40), transparent 70%); animation-duration:17s;"></div>
+    <div class="orb" style="bottom:-8%; right:6%; width:740px; height:740px; background:radial-gradient(circle at 40% 60%, rgba(255,127,0,.45), rgba(244,63,94,.30), transparent 72%); animation-duration:18s;"></div>
+  </div>
+
+  <!-- PRELOADER -->
+  <div id="preloader" class="preloader">
+    <div class="loader neon-outline"></div>
+    <div class="ty-subtitle" style="margin-top:14px;">Загрузка дашборда...</div>
+  </div>
+
+  <main class="container">
+    <!-- HEADER -->
+    <header class="dashboard-header">
+      <div>
+        <h1 class="ty-title">
+          <span class="animated-gradient-text">Интерактивный дашборд</span><br/>
+          <span style="font-weight:800">Автоматизированная бизнес‑аналитика</span>
+        </h1>
+        <p id="last-updated" class="ty-subtitle" style="margin-top:6px;">Демонстрационные данные</p>
+      </div>
+      <div class="actions">
+        <input id="csv-upload" type="file" accept=".csv"/>
+        <label for="csv-upload" class="btn neon-outline"><i class="fa-solid fa-upload"></i>Загрузить CSV</label>
+        <button id="reset-data-btn" class="btn neon-outline"><i class="fa-solid fa-rotate"></i>Сбросить</button>
+        <a id="download-template" href="#" download="data-template.csv" class="btn" title="Скачать шаблон CSV">
+          <i class="fa-solid fa-file-arrow-down"></i>Шаблон
+        </a>
+      </div>
+    </header>
+
+    <!-- KPI GRID -->
+    <section class="kpi-grid">
+      <div class="card kpi-card neon-outline">
+        <div class="kpi-top">
+          <div class="kpi-icon"><i class="fa-solid fa-ruble-sign"></i></div>
+          <span id="revenue-change" class="kpi-change">—</span>
+        </div>
+        <div>
+          <div class="kpi-title">Общая выручка</div>
+          <div id="total-revenue" class="kpi-value number-gradient-flow">₽0</div>
+        </div>
+      </div>
+
+      <div class="card kpi-card neon-outline">
+        <div class="kpi-top">
+          <div class="kpi-icon"><i class="fa-solid fa-users"></i></div>
+          <span id="orders-change" class="kpi-change">—</span>
+        </div>
+        <div>
+          <div class="kpi-title">Кол-во продаж</div>
+          <div id="total-orders" class="kpi-value number-gradient-flow">0</div>
+        </div>
+      </div>
+
+      <div class="card kpi-card neon-outline">
+        <div class="kpi-top">
+          <div class="kpi-icon"><i class="fa-solid fa-tag"></i></div>
+          <span id="avg-check-change" class="kpi-change">—</span>
+        </div>
+        <div>
+          <div class="kpi-title">Средний чек</div>
+          <div id="avg-check" class="kpi-value number-gradient-flow">₽0</div>
+        </div>
+      </div>
+
+      <div class="card kpi-card neon-outline">
+        <div class="kpi-top">
+          <div class="kpi-icon"><i class="fa-solid fa-chart-pie"></i></div>
+          <span id="profit-margin-change" class="kpi-change">—</span>
+        </div>
+        <div>
+          <div class="kpi-title">Маржинальность</div>
+          <div id="profit-margin" class="kpi-value number-gradient-flow">0%</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHARTS ROW 1 -->
+    <section class="main-grid">
+      <div class="card neon-outline">
+        <div class="widget-header">
+          <h2 class="widget-title">Динамика по месяцам</h2>
+          <div id="metric-toggle" class="segmented">
+            <button class="seg-btn active" data-metric="revenue">Выручка</button>
+            <button class="seg-btn" data-metric="profit">Прибыль</button>
+          </div>
+        </div>
+        <div class="chart-container"><canvas id="revenue-chart"></canvas></div>
+      </div>
+
+      <div class="card neon-outline">
+        <div class="widget-header">
+          <h2 class="widget-title">Выручка по категориям</h2>
+        </div>
+        <div class="chart-container"><canvas id="category-chart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- CHARTS ROW 2 -->
+    <section class="main-grid">
+      <div class="card neon-outline">
+        <div class="widget-header">
+          <h2 class="widget-title">Продажи по регионам</h2>
+        </div>
+        <div class="chart-container"><canvas id="region-chart"></canvas></div>
+      </div>
+
+      <div class="card neon-outline">
+        <div class="widget-header">
+          <h2 class="widget-title">Топ‑5 продуктов по выручке</h2>
+        </div>
+        <div class="table-wrap">
+          <table id="top-products-table">
+            <thead>
+              <tr>
+                <th>Продукт</th>
+                <th style="text-align:right;">Продано (шт)</th>
+                <th style="text-align:right;">Выручка</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // ---------- HELPERS ----------
+    const getVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const COLOR = {
+      text: getVar('--text'),
+      textDim: getVar('--text-dim'),
+      grid: getVar('--grid'),
+      cyan: getVar('--neon-cyan'),
+      blue: getVar('--neon-blue'),
+      violet: getVar('--neon-violet'),
+      orange: getVar('--neon-orange'),
+      border: getVar('--border')
+    };
+
+    const CHART_PALETTE = [ COLOR.blue, COLOR.cyan, COLOR.violet, COLOR.orange, '#06b6d4', '#eab308', '#ef4444' ];
+
+    const formatCurrency = (val) => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(val);
+    const animateValue = (el, start, end, duration, prefix='', suffix='')=>{
+      let startTS=null;
+      const step = ts=>{
+        if(!startTS) startTS=ts;
+        const p = Math.min(1,(ts-startTS)/duration);
+        const cur = Math.floor(start + (end-start)*p);
+        el.textContent = `${prefix}${cur.toLocaleString('ru-RU')}${suffix}`;
+        if(p<1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+    const setChangeIndicator = (el, value)=>{
+      el.innerHTML = `<i class="fa-solid ${value>=0?'fa-arrow-trend-up':'fa-arrow-trend-down'}"></i> ${Math.abs(value)}%`;
+      el.className = `kpi-change ${value>=0?'positive':'negative'}`;
+    };
+
+    // ---------- DEFAULT DATA ----------
+    const defaultRawData = `date,product_name,category,region,units_sold,unit_price,unit_cost
+2023-01-15,Смартфон "Космос X1",Электроника,Москва,50,30000,22000
+2023-01-20,Джинсы "Классика",Одежда,СПб,120,3500,1500
+2023-02-10,Смартфон "Космос X1",Электроника,СПб,30,30500,22000
+2023-02-18,Кофе в зернах "Арабика",Продукты,Москва,200,800,450
+2023-02-25,Книга "Веб-дизайн 2023",Книги,Новосибирск,80,1200,300
+2023-03-05,Кроссовки "Атлет",Спорт,Екатеринбург,60,5500,2500
+2023-03-12,Джинсы "Классика",Одежда,Москва,150,3500,1500
+2023-04-08,Наушники "Аудиофил",Электроника,Казань,180,4200,2800
+2023-04-22,Смартфон "Космос X1",Электроника,Екатеринбург,25,31000,22500
+2023-05-15,Кофе в зернах "Арабика",Продукты,СПб,250,850,450
+2023-05-28,Книга "Веб-дизайн 2023",Книги,Москва,110,1200,300
+2023-06-10,Наушники "Аудиофил",Электроника,Москва,220,4200,2800
+2023-06-19,Кроссовки "Атлет",Спорт,СПб,40,5800,2600
+2023-07-07,Джинсы "Классика",Одежда,Казань,90,3600,1600
+2023-07-21,Смартфон "Космос X1",Электроника,Новосибирск,45,31500,22500`.trim();
+
+    // ---------- STATE ----------
+    let state = {};
+    const charts = {};
+
+    // ---------- CSV PARSE ----------
+    function parseCSV(csvText){
+      try{
+        const lines = csvText.trim().split(/\r?\n/);
+        let delimiter = ',';
+        // эвристика: если ; встречается чаще, используем ;
+        const commaCount = (lines[0].match(/,/g)||[]).length;
+        const semiCount  = (lines[0].match(/;/g)||[]).length;
+        if (semiCount > commaCount) delimiter = ';';
+
+        const headers = lines[0].split(delimiter).map(h=>h.trim());
+        const required = ['date','product_name','category','region','units_sold','unit_price','unit_cost'];
+        if (!required.every(h=>headers.includes(h))){
+          throw new Error('Отсутствуют обязательные заголовки: ' + required.join(', '));
+        }
+        const rows = lines.slice(1).map(line=>{
+          const vals = line.split(delimiter);
+          const obj = {};
+          headers.forEach((h,idx)=> obj[h] = (vals[idx]??'').trim());
+          return obj;
+        });
+        return rows;
+      }catch(err){
+        alert('Ошибка парсинга CSV: ' + err.message);
+        return null;
+      }
+    }
+
+    // ---------- DATA PROCESS ----------
+    function processRawData(raw){
+      const parsed = parseCSV(raw);
+      if(!parsed) return null;
+
+      const sum = (arr,fn)=>arr.reduce((a,b)=>a+fn(b),0);
+
+      const totalRevenue = sum(parsed, r => Number(r.units_sold)*Number(r.unit_price));
+      const totalCost    = sum(parsed, r => Number(r.units_sold)*Number(r.unit_cost));
+      const totalProfit  = totalRevenue - totalCost;
+      const totalOrders  = parsed.length;
+
+      const kpi = {
+        revenue: totalRevenue,
+        orders: totalOrders,
+        avgCheck: totalOrders>0 ? totalRevenue/totalOrders : 0,
+        profitMargin: totalRevenue>0 ? +(totalProfit/totalRevenue*100).toFixed(1) : 0,
+        // демо‑дельты (в реальности — сравнение с предыдущим периодом)
+        revenueChange: 15.2, ordersChange: 9.8, avgCheckChange: 5.3, profitMarginChange: 2.1
+      };
+
+      // По месяцам
+      const byMonth = parsed.reduce((acc,r)=>{
+        const m = r.date.substring(0,7)+'-01';
+        if(!acc[m]) acc[m]={month:m,revenue:0,profit:0};
+        const rev = Number(r.units_sold)*Number(r.unit_price);
+        const cst = Number(r.units_sold)*Number(r.unit_cost);
+        acc[m].revenue += rev;
+        acc[m].profit  += (rev - cst);
+        return acc;
+      },{});
+      const salesData = Object.values(byMonth).sort((a,b)=> new Date(a.month)-new Date(b.month));
+
+      // Категории
+      const byCat = parsed.reduce((acc,r)=>{
+        const rev = Number(r.units_sold)*Number(r.unit_price);
+        acc[r.category] = (acc[r.category]||0) + rev;
+        return acc;
+      },{});
+      const categoryData = Object.keys(byCat).map(k=>({name:k,value:byCat[k]}));
+
+      // Регионы
+      const byRegion = parsed.reduce((acc,r)=>{
+        const rev = Number(r.units_sold)*Number(r.unit_price);
+        acc[r.region] = (acc[r.region]||0) + rev;
+        return acc;
+      },{});
+      const regionData = Object.keys(byRegion).map(k=>({region:k,sales:byRegion[k]}));
+
+      // Топ продукты
+      const byProduct = parsed.reduce((acc,r)=>{
+        if(!acc[r.product_name]) acc[r.product_name]={name:r.product_name,sales:0,revenue:0};
+        acc[r.product_name].sales   += Number(r.units_sold);
+        acc[r.product_name].revenue += Number(r.units_sold)*Number(r.unit_price);
+        return acc;
+      },{});
+      const topProducts = Object.values(byProduct).sort((a,b)=>b.revenue-a.revenue).slice(0,5);
+
+      return {kpi, salesData, categoryData, regionData, topProducts};
+    }
+
+    // ---------- RENDER ----------
+    function renderKPIs(kpi){
+      animateValue(document.getElementById('total-revenue'), 0, kpi.revenue, 1200, '₽');
+      animateValue(document.getElementById('total-orders'),  0, kpi.orders,  1200);
+      animateValue(document.getElementById('avg-check'),     0, kpi.avgCheck,1200,'₽');
+      animateValue(document.getElementById('profit-margin'), 0, kpi.profitMargin,1200,'','%');
+      setChangeIndicator(document.getElementById('revenue-change'),       kpi.revenueChange);
+      setChangeIndicator(document.getElementById('orders-change'),        kpi.ordersChange);
+      setChangeIndicator(document.getElementById('avg-check-change'),     kpi.avgCheckChange);
+      setChangeIndicator(document.getElementById('profit-margin-change'), kpi.profitMarginChange);
+    }
+
+    function renderTopProducts(rows){
+      const tbody = document.querySelector('#top-products-table tbody');
+      tbody.innerHTML = rows.map(r=>`
+        <tr>
+          <td>${r.name}</td>
+          <td style="text-align:right;">${r.sales.toLocaleString('ru-RU')}</td>
+          <td style="text-align:right;">${formatCurrency(r.revenue)}</td>
+        </tr>`).join('');
+    }
+
+    // ---------- CHARTS ----------
+    function initCharts(){
+      // Глобальные дефолты
+      Chart.defaults.color = COLOR.textDim;
+      Chart.defaults.font.family = 'Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      Chart.defaults.plugins.legend.labels.color = COLOR.textDim;
+
+      // Revenue chart
+      const revCtx = document.getElementById('revenue-chart').getContext('2d');
+      charts.revenue = new Chart(revCtx, {
+        type:'bar',
+        data:{labels:[],datasets:[]},
+        options:{
+          maintainAspectRatio:false,
+          responsive:true,
+          interaction:{mode:'index',intersect:false},
+          plugins:{
+            legend:{labels:{color:COLOR.textDim}},
+            tooltip:{
+              backgroundColor:'rgba(17,17,18,.96)',
+              titleColor:COLOR.text,
+              bodyColor:COLOR.textDim,
+              borderColor:COLOR.border,
+              borderWidth:1,
+              padding:12,
+              cornerRadius:10
+            }
+          },
+          scales:{
+            x:{
+              type:'time',
+              time:{unit:'month'},
+              ticks:{color:COLOR.textDim},
+              grid:{color:'rgba(255,255,255,.06)'}
+            },
+            y:{
+              ticks:{
+                color:COLOR.textDim,
+                callback:(v)=> Intl.NumberFormat('ru-RU',{notation:'compact'}).format(v)
+              },
+              grid:{color:'rgba(255,255,255,.06)'}
+            }
+          }
+        }
+      });
+
+      // Category chart
+      const catCtx = document.getElementById('category-chart').getContext('2d');
+      charts.category = new Chart(catCtx, {
+        type:'pie',
+        data:{labels:[],datasets:[]},
+        options:{
+          maintainAspectRatio:false,
+          plugins:{
+            legend:{
+              position:'right',
+              labels:{usePointStyle:true,boxWidth:10,color:COLOR.textDim}
+            },
+            tooltip:{
+              backgroundColor:'rgba(17,17,18,.96)',
+              titleColor:COLOR.text, bodyColor:COLOR.textDim,
+              borderColor:COLOR.border,borderWidth:1,padding:12,cornerRadius:10
+            }
+          }
+        }
+      });
+
+      // Region chart
+      const regCtx = document.getElementById('region-chart').getContext('2d');
+      charts.region = new Chart(regCtx, {
+        type:'bar',
+        data:{labels:[],datasets:[]},
+        options:{
+          maintainAspectRatio:false,
+          plugins:{
+            legend:{display:false},
+            tooltip:{
+              backgroundColor:'rgba(17,17,18,.96)',
+              titleColor:COLOR.text, bodyColor:COLOR.textDim,
+              borderColor:COLOR.border,borderWidth:1,padding:12,cornerRadius:10
+            }
+          },
+          scales:{
+            x:{ticks:{color:COLOR.textDim},grid:{color:'rgba(255,255,255,.06)'}},
+            y:{ticks:{color:COLOR.textDim},grid:{color:'rgba(255,255,255,.06)'}}
+          }
+        }
+      });
+    }
+
+    function gradientBar(ctx){
+      const {chartArea} = ctx.chart;
+      if (!chartArea) return COLOR.cyan; // пока нет размеров
+      const g = ctx.chart.ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+      g.addColorStop(0, COLOR.blue);
+      g.addColorStop(1, COLOR.cyan);
+      return g;
+    }
+    function updateRevenueChart(salesData, metric){
+      const labels = salesData.map(d=> d.month);
+      const values = salesData.map(d=> d[metric]);
+      const forecast = salesData.map(d=> ({x:d.month, y: d[metric]*1.1}));
+
+      charts.revenue.data.labels = labels;
+      charts.revenue.data.datasets = [
+        {
+          type:'line',
+          label:'Прогноз',
+          data: forecast,
+          borderColor: COLOR.violet,
+          borderDash:[6,6],
+          borderWidth:2,
+          tension:.35,
+          pointRadius:0
+        },
+        {
+          type:'bar',
+          label: metric==='revenue'?'Выручка':'Прибыль',
+          data: values,
+          backgroundColor:(ctx)=> gradientBar(ctx),
+          borderRadius:5
+        }
+      ];
+      charts.revenue.update();
+    }
+
+    function updateAllCharts(data){
+      updateRevenueChart(data.salesData, 'revenue');
+
+      // Category
+      charts.category.data.labels = data.categoryData.map(c=>c.name);
+      charts.category.data.datasets = [{
+        data: data.categoryData.map(c=>c.value),
+        backgroundColor: CHART_PALETTE.slice(0, data.categoryData.length).map((c,i)=> c)
+      }];
+      charts.category.update();
+
+      // Region
+      charts.region.data.labels = data.regionData.map(r=>r.region);
+      charts.region.data.datasets = [{
+        label:'Продажи',
+        data: data.regionData.map(r=>r.sales),
+        backgroundColor: (ctx)=>gradientBar(ctx),
+        borderRadius:5
+      }];
+      charts.region.update();
+    }
+
+    // ---------- LOAD & RENDER ----------
+    function loadAndRenderDashboard(raw){
+      const pre = document.getElementById('preloader');
+      pre.style.opacity='1';
+      pre.style.display='grid';
+      setTimeout(()=>{
+        state = processRawData(raw);
+        if(state){
+          renderKPIs(state.kpi);
+          updateAllCharts(state);
+          renderTopProducts(state.topProducts);
+        }
+        pre.style.opacity='0';
+        setTimeout(()=> pre.style.display='none', 350);
+      }, 400);
+    }
+
+    // ---------- EVENTS ----------
+    function initEventListeners(){
+      const upload = document.getElementById('csv-upload');
+      upload.addEventListener('change', (e)=>{
+        const file = e.target.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev)=>{
+          loadAndRenderDashboard(ev.target.result);
+          document.getElementById('last-updated').textContent = `Данные из файла: ${file.name}`;
+        };
+        reader.readAsText(file);
+      });
+
+      document.getElementById('reset-data-btn').addEventListener('click', ()=>{
+        loadAndRenderDashboard(defaultRawData);
+        document.getElementById('last-updated').textContent = 'Демонстрационные данные';
+      });
+
+      // Сегмент‑переключатель метрики
+      document.getElementById('metric-toggle').addEventListener('click', (e)=>{
+        const btn = e.target.closest('.seg-btn'); if(!btn) return;
+        document.querySelectorAll('#metric-toggle .seg-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const metric = btn.dataset.metric;
+        updateRevenueChart(state.salesData, metric);
+      });
+
+      // Сгенерировать и отдать шаблон CSV
+      const tpl = [
+        ['date','product_name','category','region','units_sold','unit_price','unit_cost'].join(','),
+        ['2024-01-10','Товар A','Категория 1','Москва','120','1990','990'].join(','),
+        ['2024-01-18','Товар B','Категория 2','СПб','85','3490','1700'].join(','),
+        ['2024-02-03','Товар C','Категория 1','Казань','60','2490','1200'].join(',')
+      ].join('\n');
+      const blob = new Blob([tpl], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.getElementById('download-template');
+      a.href = url;
+    }
+
+    // ---------- INIT ----------
+    initCharts();
+    loadAndRenderDashboard(defaultRawData);
+    initEventListeners();
+  });
+  </script>
+</body>
+</html>
